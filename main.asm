@@ -96,14 +96,22 @@ ST7/
 ;
 ;************************************************************************
 
-main:
-	RSP			; Reset Stack Pointer
 
-		
-boucl
-
+RSP			; Reset Stack Pointer
 	
-	JP	boucl
+	ld		A, #0
+	
+pour
+	cp		A, #10
+	jruge	fin
+	inc 	A
+	jp		pour
+	
+		
+		
+		
+fin
+	JP	fin
 
 
 
