@@ -41,7 +41,7 @@ ST7/
 ;
 ;************************************************************************
 
-
+somme DS.B 1
 
 
 ;************************************************************************
@@ -98,12 +98,28 @@ ST7/
 
 main:
 	RSP			; Reset Stack Pointer
-
-		
-boucl
-
 	
-	JP	boucl
+	push	X
+	clr 	X
+	clr		somme
+	
+pour
+	cp		X,#21
+	jruge	sortie
+	
+	ld		A, X
+	add		A, somme
+	ld		somme, A
+	
+	inc 	X
+	jp		pour
+	
+		
+sortie
+	pop		X
+		
+fin
+	JP	fin
 
 
 
