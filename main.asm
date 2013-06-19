@@ -100,8 +100,8 @@ allume_pair:
 	RET
 	
 ;Durée = X(10Y+8)+11 cycles
-;pour X=151 et Y=250 : 151*(250*10+8)+11 = 378 719 cycles ~= 0.5 sec @ 760KHz
-;pour X=199 et Y=250 : 199*(250*10+8)+11 = 499 103 cycles ~= 0.5 sec @ 1MHz
+;pour X=151 et Y=250 : 151*(250*10+8)+11 = 378 719 cycles ~= 0.5 sec @ 760KHz (Sans correction de fréquence)
+;pour X=199 et Y=250 : 199*(250*10+8)+11 = 499 103 cycles ~= 0.5 sec @ 1MHz (Avec correction de fréquence)
 attend_500ms:
 	LD X, #199 		;2							|
 	LD Y, #250		;3							|	5
@@ -158,7 +158,7 @@ RCCR0	EQU	$FFDE
 main:
 	RSP			; Reset Stack Pointer
 	CALL	init_ports
-	CALL init_oscRC
+	CALL init_oscRC		;LIGNE A COMMENTER POUR EXECUTER SANS CORRECTION DE FREQUENCE
 	
 debut
 	CALL	allume_impair
