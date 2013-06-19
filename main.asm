@@ -78,7 +78,28 @@ ST7/
 ;
 ;************************************************************************
 
+init_ports_spi:
+	;SPI
+	LD A, #$0C
+	LD SPICR, A
+	LD A, #$03
+	LD SPISR, A
+	LD A, #$5C
+	LD SPICR, A
 
+	;PB2 en sortie
+	LD	A,PBDDR
+	OR	A,#%00000100
+	LD	PBDDR,A
+	
+	;PB2 en push_pull
+	LD	A,PBOR
+	OR	A,#%00000100
+	LD	PBOR,A
+
+	CALL MAX7219_Init
+	CALL MAX7219_Clear
+	RET
 
 
 
@@ -98,12 +119,18 @@ ST7/
 
 main:
 	RSP			; Reset Stack Pointer
+	CALL init_ports_spi
+
+	LD A, #1
+	LD DisplayChar_Digit, A
+	LD A, #5
+	LD DisplayChar_Character, A
+	CALL MAX7219_DisplayChar
+
 
 		
-boucl
-
-	
-	JP	boucl
+fin
+	JP	fin
 
 
 
