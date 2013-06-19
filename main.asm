@@ -42,7 +42,8 @@ ST7/
 ;************************************************************************
 
 
-
+counter_unites DS.B 1
+counter_dizaines DS.B 1
 
 ;************************************************************************
 ;
@@ -78,8 +79,57 @@ ST7/
 ;
 ;************************************************************************
 
+init_ports_spi:
+	;SPI
+	LD A, #$0C
+	LD SPICR, A
+	LD A, #$03
+	LD SPISR, A
+	LD A, #$5C
+	LD SPICR, A
+
+	;PB2 en sortie
+	LD	A,PBDDR
+	OR	A,#%00000100
+	LD	PBDDR,A
+	
+	;PB2 en push_pull
+	LD	A,PBOR
+	OR	A,#%00000100
+	LD	PBOR,A
+
+	CALL MAX7219_Init
+	CALL MAX7219_Clear
+	RET
 
 
+attend_500ms:
+	LD X, #151
+	LD Y, #250
+attend_500ms_boucle
+	DEC Y
+	CP	Y, #0
+	JRNE attend_500ms_boucle
+
+	DEC X
+	CP	X, #0
+	JRNE attend_500ms_boucle
+	
+	RET
+
+afficher:
+	LD A, #2
+	LD DisplayChar_Digit, A
+	LD A, counter_unites
+	LD DisplayChar_Character, A
+	CALL MAX7219_DisplayChar
+
+	LD A, #1
+	LD DisplayChar_Digit, A
+	LD A, counter_dizaines
+	LD DisplayChar_Character, A
+	CALL MAX7219_DisplayChar
+	RET
 
 
 
@@ -98,12 +148,34 @@ ST7/
 
 main:
 	RSP			; Reset Stack Pointer
+	CALL init_ports_spi
+
+	clr counter_unites
+	clr counter_dizaines
+
+
+while
+	call afficher
+	call attend_500ms
+	
+	inc counter_unites
+	ld A, counter_unites
+	cp A, #10
+	jrne while
+
+	clr counter_unites
+	inc counter_dizaines
+	ld A, counter_dizaines
+	cp A, #10
+	jrne while
+
+	clr counter_dizaines
+	jp while
+
 
 		
-boucl
-
-	
-	JP	boucl
+fin
+	JP	fin
 
 
 
