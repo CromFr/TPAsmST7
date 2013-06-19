@@ -13,7 +13,7 @@ ST7/
 	#include "ST7Lite2.INC"
 
 	; Enlever le commentaire si vous utilisez les afficheurs
-;	#include "MAX7219.INC"
+	#include "MAX7219.INC"
 
 
 ;************************************************************************
