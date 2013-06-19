@@ -13,7 +13,7 @@ ST7/
 	#include "ST7Lite2.INC"
 
 	; Enlever le commentaire si vous utilisez les afficheurs
-;	#include "MAX7219.INC"
+	#include "MAX7219.INC"
 
 
 ;************************************************************************
@@ -40,9 +40,6 @@ ST7/
 ;  ZONE DE DECLARATION DES VARIABLES
 ;
 ;************************************************************************
-
-
-
 
 ;************************************************************************
 ;
@@ -79,9 +76,35 @@ ST7/
 ;************************************************************************
 
 
+allume_impair:
+	LD A, PADR
+	OR A, #%10001001
+	LD	PADR,A
 
+	LD A, PBDR
+	OR A, #%00100000
+	LD	PBDR,A
+	RET
 
-
+init_ports:
+	;Port A direction
+	LD	A,PADDR
+	OR	A,#%10001001
+	LD	PADDR,A
+	;Port B direction
+	LD	A,PBDDR
+	OR	A,#%00100000
+	LD	PBDDR,A
+	
+	;Port A option
+	LD	A,PAOR
+	OR	A,#%10001001
+	LD	PAOR,A
+	;Port B option
+	LD	A,PBOR
+	OR	A,#%00100000
+	LD	PBOR,A
+	RET
 
 ;************************************************************************
 ;
@@ -99,13 +122,13 @@ ST7/
 main:
 	RSP			; Reset Stack Pointer
 
-		
-boucl
-
+debut
+	CALL	init_ports
+	CALL	allume_impair
+	JP		debut
 	
-	JP	boucl
-
-
+fin:
+	JP fin
 
 ;************************************************************************
 ;
