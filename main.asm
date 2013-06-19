@@ -13,7 +13,7 @@ ST7/
 	#include "ST7Lite2.INC"
 
 	; Enlever le commentaire si vous utilisez les afficheurs
-;	#include "MAX7219.INC"
+	#include "MAX7219.INC"
 
 
 ;************************************************************************
@@ -41,9 +41,6 @@ ST7/
 ;
 ;************************************************************************
 
-
-
-
 ;************************************************************************
 ;
 ;  FIN DE LA ZONE DE DECLARATION DES VARIABLES
@@ -63,7 +60,6 @@ ST7/
 
 
 
-
 ;************************************************************************
 ;
 ;  FIN DE LA ZONE DE DECLARATION DES CONSTANTES
@@ -79,9 +75,72 @@ ST7/
 ;************************************************************************
 
 
+allume_impair:
+	LD A, PADR
+	OR A, #%10001001
+	AND A, #%11101101
+	LD	PADR,A
 
+	LD A, PBDR
+	OR A, #%00100000
+	AND A, #%10101111
+	LD	PBDR,A
+	RET
+	
+allume_pair:
+	LD A, PADR
+	OR A, #%00010010
+	AND A, #%01110110
+	LD	PADR,A
 
+	LD A, PBDR
+	OR A, #%01010000
+	AND A, #%11011111
+	LD	PBDR,A
+	RET
+	
+;Durée = X(10Y+8)+11 cycles
+;pour X=151 et Y=250 : 151*(250*10+8)+11 = 378 719 cycles ~= 0.5 sec @ 760KHz
+;pour X=199 et Y=250 : 199*(250*10+8)+11 = 499 103 cycles ~= 0.5 sec @ 1MHz
+attend_500ms:
+	LD X, #199 		;2							|
+	LD Y, #250		;3							|	5
+attend_500ms_boucle
+	DEC Y					;4							|
+	CP	Y, #0			;3							|
+	JRNE attend_500ms_boucle ;3		|	10
 
+	DEC X					;3							|
+	CP	X, #0			;2							| 
+	JRNE attend_500ms_boucle ;3		| 8
+	
+	RET						;6
+
+init_ports:
+	;Port A direction
+	LD	A,PADDR
+	OR	A,#%10011011
+	LD	PADDR,A
+	;Port B direction
+	LD	A,PBDDR
+	OR	A,#%01110000
+	LD	PBDDR,A
+	
+	;Port A option
+	LD	A,PAOR
+	OR	A,#%10011011
+	LD	PAOR,A
+	;Port B option
+	LD	A,PBOR
+	OR	A,#%01110000
+	LD	PBOR,A
+	RET
+	
+init_oscRC:
+RCCR0	EQU	$FFDE
+	LD	A, RCCR0
+	LD	RCCR, A
+	RET
 
 ;************************************************************************
 ;
@@ -98,14 +157,18 @@ ST7/
 
 main:
 	RSP			; Reset Stack Pointer
-
-		
-boucl
-
+	CALL	init_ports
+	CALL init_oscRC
 	
-	JP	boucl
-
-
+debut
+	CALL	allume_impair
+	CALL	attend_500ms
+	CALL	allume_pair
+	CALL	attend_500ms
+	JP		debut
+	
+fin:
+	JP fin
 
 ;************************************************************************
 ;
