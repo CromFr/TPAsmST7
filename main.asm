@@ -47,6 +47,8 @@ counter_dizaines DS.B 1
 
 counter_state DS.B 1
 
+compte_it DS.B 1
+
 ;************************************************************************
 ;
 ;  FIN DE LA ZONE DE DECLARATION DES VARIABLES
@@ -81,9 +83,43 @@ counter_state DS.B 1
 ;
 ;************************************************************************
 
-init_ports_spi:
+
+;===============================> Initialisation du programme
+init_chip:
+	CALL init_ports
+	CALL init_spi
+	CALL init_int
+	CALL init_oscRC
+	RET
+
+
+init_spi:
+	LD A, #$0C
+	LD SPICR, A
+	LD A, #$03
+	LD SPISR, A
+	LD A, #$5C
+	LD SPICR, A
+
+	CALL MAX7219_Init
+	CALL MAX7219_Clear
+	RET
+
+init_int:
+	;ei0 et ei 3 utilisées en front desc seul
+	LD A, EICR
+	AND A, #%10111101
+	OR  A, #%10000010
+	LD EICR, A
 	
-	;======================== Entrées/sorties
+	;PB0 pour ei3 et PA3 pour ei0
+	LD A, EISR
+	OR  A, #%00000011
+	AND A, #%00111111
+	LD EISR, A
+	RET
+
+init_ports:
 	;PA3 en entrée
 	LD	A,PADDR
 	AND	A,#%11110111
@@ -104,46 +140,47 @@ init_ports_spi:
 	LD	A,PBOR
 	OR	A,#%00000101
 	LD	PBOR,A
-	
-	;======================== SPI
-	LD A, #$0C
-	LD SPICR, A
-	LD A, #$03
-	LD SPISR, A
-	LD A, #$5C
-	LD SPICR, A
+	RET
 
-	CALL MAX7219_Init
-	CALL MAX7219_Clear
-	
-	;======================== Interruptions
-	;ei0 et ei 3 utilisées en front desc seul
-	LD A, EICR
-	AND A, #%10111101
-	OR  A, #%10000010
-	LD EICR, A
-	
-	;PB0 pour ei3 et PA3 pour ei0
-	LD A, EISR
-	OR  A, #%00000011
-	AND A, #%00111111
-	LD EISR, A
-	
+init_timer:
+	ld A, #%00000000
+	ld LTCSR1, A
+	RET
+
+init_oscRC:
+RCCR0	EQU	$FFDE
+	LD	A, RCCR0
+	LD	RCCR, A
 	RET
 
 
-attend_500ms:
-	LD X, #151
-	LD Y, #250
-attend_500ms_boucle
-	DEC Y
-	CP	Y, #0
-	JRNE attend_500ms_boucle
 
-	DEC X
-	CP	X, #0
-	JRNE attend_500ms_boucle
-	
+
+timer_8ms_interrupt:
+	ld X, compte_it
+	inc X
+	ld compte_it, X
+
+	ld A, LTCSR1
+
+	IRET
+
+attend_500ms:
+	clr compte_it
+
+	;Lancer timer
+	ld A, LTCSR1
+	or A, #%00010000
+	ld LTCSR1, A
+
+attend_500ms_boucle
+	ld A, compte_it
+	cp A, #63
+	jrult attend_500ms_boucle
+
+	ld A, LTCSR1
+	and A, #%11101111
+	ld LTCSR1, A
 	RET
 
 afficher:
@@ -189,7 +226,7 @@ arret_interrupt:
 main:
 	RSP			; Reset Stack Pointer
 	RIM
-	CALL init_ports_spi
+	CALL init_chip
 
 	clr counter_unites
 	clr counter_dizaines
@@ -249,7 +286,7 @@ dummy_rt:	IRET	; Procédure vide : retour au programme principal.
 
 		DC.W	dummy_rt	; Adresse FFE0-FFE1h
 SPI_it		DC.W	dummy_rt	; Adresse FFE2-FFE3h
-lt_RTC1_it	DC.W	dummy_rt	; Adresse FFE4-FFE5h
+lt_RTC1_it	DC.W	timer_8ms_interrupt	; Adresse FFE4-FFE5h
 lt_IC_it	DC.W	dummy_rt	; Adresse FFE6-FFE7h
 at_timerover_it	DC.W	dummy_rt	; Adresse FFE8-FFE9h
 at_timerOC_it	DC.W	dummy_rt	; Adresse FFEA-FFEBh
