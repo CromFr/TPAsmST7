@@ -45,6 +45,8 @@ ST7/
 counter_unites DS.B 1
 counter_dizaines DS.B 1
 
+counter_state DS.B 1
+
 ;************************************************************************
 ;
 ;  FIN DE LA ZONE DE DECLARATION DES VARIABLES
@@ -80,7 +82,30 @@ counter_dizaines DS.B 1
 ;************************************************************************
 
 init_ports_spi:
-	;SPI
+	
+	;======================== Entrées/sorties
+	;PA3 en entrée
+	LD	A,PADDR
+	AND	A,#%11110111
+	LD	PADDR,A
+	
+	;PA3 en pull-up
+	LD	A,PAOR
+	OR	A,#%00001000
+	LD	PAOR,A
+
+	;PB2 en sortie + PB0 entrée
+	LD	A,PBDDR
+	OR	A,#%00000100
+	AND	A,#%11111110
+	LD	PBDDR,A
+	
+	;PB2 en push_pull + PB0 pull up
+	LD	A,PBOR
+	OR	A,#%00000101
+	LD	PBOR,A
+	
+	;======================== SPI
 	LD A, #$0C
 	LD SPICR, A
 	LD A, #$03
@@ -88,18 +113,22 @@ init_ports_spi:
 	LD A, #$5C
 	LD SPICR, A
 
-	;PB2 en sortie
-	LD	A,PBDDR
-	OR	A,#%00000100
-	LD	PBDDR,A
-	
-	;PB2 en push_pull
-	LD	A,PBOR
-	OR	A,#%00000100
-	LD	PBOR,A
-
 	CALL MAX7219_Init
 	CALL MAX7219_Clear
+	
+	;======================== Interruptions
+	;ei0 et ei 3 utilisées en front desc seul
+	LD A, EICR
+	AND A, #%10111101
+	OR  A, #%10000010
+	LD EICR, A
+	
+	;PB0 pour ei3 et PA3 pour ei0
+	LD A, EISR
+	OR  A, #%00000011
+	AND A, #%00111111
+	LD EISR, A
+	
 	RET
 
 
@@ -130,6 +159,17 @@ afficher:
 	LD DisplayChar_Character, A
 	CALL MAX7219_DisplayChar
 	RET
+	
+	
+marche_interrupt:
+	ld A, #1
+	ld counter_state, A
+	iret
+
+arret_interrupt:
+	ld A, #0
+	ld counter_state, A
+	iret
 
 
 
@@ -148,15 +188,22 @@ afficher:
 
 main:
 	RSP			; Reset Stack Pointer
+	RIM
 	CALL init_ports_spi
 
 	clr counter_unites
 	clr counter_dizaines
+	ld A, #1
+	ld counter_state, A
 
 
 while
 	call afficher
 	call attend_500ms
+	
+	ld A, counter_state
+	cp A, #1
+	jrne while
 	
 	inc counter_unites
 	ld A, counter_unites
@@ -209,10 +256,10 @@ at_timerOC_it	DC.W	dummy_rt	; Adresse FFEA-FFEBh
 AVD_it		DC.W	dummy_rt	; Adresse FFEC-FFEDh
 		DC.W	dummy_rt	; Adresse FFEE-FFEFh
 lt_RTC2_it	DC.W	dummy_rt	; Adresse FFF0-FFF1h
-ext3_it		DC.W	dummy_rt	; Adresse FFF2-FFF3h
+ext3_it		DC.W	marche_interrupt	; Adresse FFF2-FFF3h
 ext2_it		DC.W	dummy_rt	; Adresse FFF4-FFF5h
 ext1_it		DC.W	dummy_rt	; Adresse FFF6-FFF7h
-ext0_it		DC.W	dummy_rt	; Adresse FFF8-FFF9h
+ext0_it		DC.W	arret_interrupt	; Adresse FFF8-FFF9h
 AWU_it		DC.W	dummy_rt	; Adresse FFFA-FFFBh
 softit		DC.W	dummy_rt	; Adresse FFFC-FFFDh
 reset		DC.W	main		; Adresse FFFE-FFFFh
