@@ -41,13 +41,7 @@ ST7/
 ;
 ;************************************************************************
 
-
-counter_unites DS.B 1
-counter_dizaines DS.B 1
-
-counter_state DS.B 1
-
-compte_it DS.B 1
+can_result DS.B 2
 
 ;************************************************************************
 ;
@@ -86,14 +80,11 @@ compte_it DS.B 1
 
 ;===============================> Initialisation du programme
 init_chip:
-	CALL init_ports
-	CALL init_spi
-	CALL init_int
-	CALL init_oscRC
+	CALL init_lcd
+	CALL init_can
 	RET
 
-
-init_spi:
+init_lcd:
 	LD A, #$0C
 	LD SPICR, A
 	LD A, #$03
@@ -105,108 +96,59 @@ init_spi:
 	CALL MAX7219_Clear
 	RET
 
-init_int:
-	;ei0 et ei 3 utilisées en front desc seul
-	LD A, EICR
-	AND A, #%10111101
-	OR  A, #%10000010
-	LD EICR, A
+init_can:
+	;Use PB0/nSS/AIN0 as input
+	ld A, ADCCSR
+	and A, #%11111100
+	ld ADCCSR, A
+	RET
+
+
+can_convert:
+	;Set ADON bit to start conversion
+	ld A, ADCCSR
+	or A, #%00100000
+	ld ADCCSR, A
+
+can_convert_boucle
+	ld A, ADCCSR
+	and A, #%00100000
+	cp A, #%00100000
+	jrne can_convert_boucle
+	;end boucle
+
+	;load results
+	push X
+
+	;reformat values
+	ld A, ADCDRH
+	srl A
+	srl A
+	or A, ADCDRL
+	ld X, #1
+	ld (can_result,X), A
+
+	ld A, ADCDRL
+	rlc A
+	rlc A
+	and A, #%00000011
+	ld X, #0
+	ld (can_result,X), A
 	
-	;PB0 pour ei3 et PA3 pour ei0
-	LD A, EISR
-	OR  A, #%00000011
-	AND A, #%00111111
-	LD EISR, A
-	RET
-
-init_ports:
-	;PA3 en entrée
-	LD	A,PADDR
-	AND	A,#%11110111
-	LD	PADDR,A
-	
-	;PA3 en pull-up
-	LD	A,PAOR
-	OR	A,#%00001000
-	LD	PAOR,A
-
-	;PB2 en sortie + PB0 entrée
-	LD	A,PBDDR
-	OR	A,#%00000100
-	AND	A,#%11111110
-	LD	PBDDR,A
-	
-	;PB2 en push_pull + PB0 pull up
-	LD	A,PBOR
-	OR	A,#%00000101
-	LD	PBOR,A
-	RET
-
-init_timer:
-	ld A, #%00000000
-	ld LTCSR1, A
-	RET
-
-init_oscRC:
-RCCR0	EQU	$FFDE
-	LD	A, RCCR0
-	LD	RCCR, A
+	pop X
 	RET
 
 
-
-
-timer_8ms_interrupt:
-	ld X, compte_it
-	inc X
-	ld compte_it, X
-
-	ld A, LTCSR1
-
-	IRET
-
-attend_500ms:
-	clr compte_it
-
-	;Lancer timer
-	ld A, LTCSR1
-	or A, #%00010000
-	ld LTCSR1, A
-
-attend_500ms_boucle
-	ld A, compte_it
-	cp A, #63
-	jrult attend_500ms_boucle
-
-	ld A, LTCSR1
-	and A, #%11101111
-	ld LTCSR1, A
-	RET
 
 afficher:
-	LD A, #2
-	LD DisplayChar_Digit, A
-	LD A, counter_unites
-	LD DisplayChar_Character, A
-	CALL MAX7219_DisplayChar
-
-	LD A, #1
-	LD DisplayChar_Digit, A
-	LD A, counter_dizaines
-	LD DisplayChar_Character, A
-	CALL MAX7219_DisplayChar
+	ld A, #4
+	ld DisplayChar_Digit, A
+	ld X, #1
+	ld A, (can_result,X)
+	ld DisplayChar_Character, A
+	call MAX7219_DisplayChar
 	RET
 	
-	
-marche_interrupt:
-	ld A, #1
-	ld counter_state, A
-	iret
-
-arret_interrupt:
-	ld A, #0
-	ld counter_state, A
-	iret
 
 
 
@@ -225,35 +167,14 @@ arret_interrupt:
 
 main:
 	RSP			; Reset Stack Pointer
-	RIM
 	CALL init_chip
 
-	clr counter_unites
-	clr counter_dizaines
-	ld A, #1
-	ld counter_state, A
 
 
 while
+	call can_convert
 	call afficher
-	call attend_500ms
-	
-	ld A, counter_state
-	cp A, #1
-	jrne while
-	
-	inc counter_unites
-	ld A, counter_unites
-	cp A, #10
-	jrne while
 
-	clr counter_unites
-	inc counter_dizaines
-	ld A, counter_dizaines
-	cp A, #10
-	jrne while
-
-	clr counter_dizaines
 	jp while
 
 
@@ -284,19 +205,19 @@ dummy_rt:	IRET	; Procédure vide : retour au programme principal.
 	segment 'vectit'
 
 
-		DC.W	dummy_rt	; Adresse FFE0-FFE1h
+			DC.W	dummy_rt	; Adresse FFE0-FFE1h
 SPI_it		DC.W	dummy_rt	; Adresse FFE2-FFE3h
-lt_RTC1_it	DC.W	timer_8ms_interrupt	; Adresse FFE4-FFE5h
+lt_RTC1_it	DC.W	dummy_rt	; Adresse FFE4-FFE5h
 lt_IC_it	DC.W	dummy_rt	; Adresse FFE6-FFE7h
 at_timerover_it	DC.W	dummy_rt	; Adresse FFE8-FFE9h
 at_timerOC_it	DC.W	dummy_rt	; Adresse FFEA-FFEBh
 AVD_it		DC.W	dummy_rt	; Adresse FFEC-FFEDh
-		DC.W	dummy_rt	; Adresse FFEE-FFEFh
+			DC.W	dummy_rt	; Adresse FFEE-FFEFh
 lt_RTC2_it	DC.W	dummy_rt	; Adresse FFF0-FFF1h
-ext3_it		DC.W	marche_interrupt	; Adresse FFF2-FFF3h
+ext3_it		DC.W	dummy_rt	; Adresse FFF2-FFF3h
 ext2_it		DC.W	dummy_rt	; Adresse FFF4-FFF5h
 ext1_it		DC.W	dummy_rt	; Adresse FFF6-FFF7h
-ext0_it		DC.W	arret_interrupt	; Adresse FFF8-FFF9h
+ext0_it		DC.W	dummy_rt	; Adresse FFF8-FFF9h
 AWU_it		DC.W	dummy_rt	; Adresse FFFA-FFFBh
 softit		DC.W	dummy_rt	; Adresse FFFC-FFFDh
 reset		DC.W	main		; Adresse FFFE-FFFFh
